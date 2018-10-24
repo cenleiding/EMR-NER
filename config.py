@@ -16,7 +16,7 @@ class model_config(object):
         self.word2id_path = 'resourse/data/word2id/word2id.cpkt'
         self.out_path = 'resourse/result/test-model'
 
-        self.epoch = 40
+        self.epoch = 100
         self.batch_size = 64
         self.hidden_dim = 256
         self.optimizer = 'Adam'

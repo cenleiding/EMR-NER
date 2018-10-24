@@ -16,11 +16,11 @@ class DataSet(object):
                           'B-NAME': 1, 'I-NAME': 2,
                           'B-ADDRESS': 3, 'I-ADDRESS': 4,
                           'B-ORGANIZATION': 5, 'I-ORGANIZATION': 6,
-                          'B-DETAIL': 7, 'B-DETAIL': 8}
+                          'B-DETAIL': 7, 'I-DETAIL': 8}
         self.word2id = read_word2id(word2id_path)
         self.embeddding = read_embeddding(embedding_path)
-        (sentences, tags) = read_corpus(corpus_path)
-        (self.sentences, self.labels, self.lengths) = sentences_tags2id(sentences,tags,self.word2id,self.tag2label)
+        (self.sentences_origin, tags) = read_corpus(corpus_path)
+        (self.sentences, self.labels, self.lengths) = sentences_tags2id(self.sentences_origin,tags,self.word2id,self.tag2label)
 
 def read_corpus(corpus_path):
     sentences,tags=[],[]
@@ -47,7 +47,7 @@ def read_embeddding(embedding_path):
     embedding_matrix = np.load(embedding_path)
     return embedding_matrix
 
-def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=200):
+def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=400):
     sentences_id = []
     tags_id = []
     lengths = []
@@ -82,6 +82,8 @@ def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=200):
     for i ,ids in enumerate(tags_id):
         if lengths[i] <= length:
             tags_id_np[i,:lengths[i]] = np.array(ids)
+        else:
+            lengths[i] = 0
 
     return (sentences_id_np ,tags_id_np,lengths)
 

@@ -104,31 +104,113 @@ class BiLSTM_CRF(object):
                 while True:
                     try:
                         sess.run(self.train_op)
-                        loss = sess.run(self.loss)
-                        print('epoch{}:loss is {}'.format(epoch, loss))
+                        loss,global_step = sess.run([self.loss,self.global_step])
+                        print('epoch=>{},step=>{}:loss is {}'.format(epoch,global_step,loss))
                         self.saver.save(sess,self.config.out_path,global_step=self.config.global_step)
                     except tf.errors.OutOfRangeError:
                         break
 
+                predictions, prediction_lens, golds = self.predict(sess, val_data)
+                p, r, f = self.evaluate(predictions, prediction_lens, golds)
+                print('epoch{}:验证集\nP:{}  R:{}  F:{}'.format(epoch,p, r, f))
+
+
+    def test(self, test_data):
+        with tf.Session(config=self.sess_config) as sess:
+            print('==== testing ====')
+            self.saver.restore(sess, self.config.out_path)
+            predictions, prediction_lens, golds = self.predict(sess, test_data)
+            p, r, f = self.evaluate(predictions,prediction_lens,golds)
+            print('P:{}\nR:{}\nF:{}'.format(p,r,f))
+
+    def demo(self, demo_data):
+        result = {'name':[],
+                  'address':[],
+                  'organization':[],
+                  'datail':[]}
+        with tf.Session(config=self.sess_config) as sess:
+            print('==== demo ====')
+            self.saver.restore(sess, self.config.out_path)
+            predictions, prediction_lens, _ = self.predict(sess, demo_data)
+            for prediction,lens,sentence_origin in zip(predictions,prediction_lens,demo_data.sentences_origin):
+                prediction_index = self.split_entity(prediction, lens)
+                for (start,end) in prediction_index:
+                    if prediction[start] == 1:
+                        result['name'].append(str(sentence_origin[start,end]))
+                    elif prediction[start] == 3:
+                        result['address'].append(str(sentence_origin[start,end]))
+                    elif prediction[start] == 5:
+                        result['organization'].append(str(sentence_origin[start, end]))
+                    elif prediction[start] == 7:
+                        result['detail'].append(str(sentence_origin[start, end]))
 
     def predict(self,sess,data):
-        labels = []
-        seqs = []
+        predictions = []
+        prediction_lens = []
+        golds = []
         sess.run(self.iter.initializer, feed_dict={self.inputs: data.sentences,
                                                    self.labels: data.labels,
                                                    self.lengths: data.lengths})
         while True:
             try:
-                seq_len_list,logits,transition_params = sess.run([self.length_batch,self.logits,self.transition_params])
+                seq_len_list,labels,logits,transition_params = sess.run([self.length_batch,self.label_batch,self.logits,self.transition_params])
                 label_list = []
                 for logit,seq_len in zip(logits,seq_len_list):
                     viterbi_seq,_ = tf.contrib.crf.viterbi_decode(logit[:seq_len],transition_params)
                     label_list.append(viterbi_seq)
-                labels.extend(label_list)
-                seqs.extend(seq_len_list)
+                predictions.extend(label_list)
+                prediction_lens.extend(seq_len_list)
+                golds.extend(labels)
             except tf.errors.OutOfRangeError:
                 break
 
-        return labels,seqs
+        return predictions,prediction_lens,golds
+
+    def evaluate(self,predictions,prediction_lens,golds):
+        right = 0
+        prediction_num = 0
+        gold_num = 0
+        for prediction,gold,lens in zip(predictions,golds,prediction_lens):
+            prediction_index = self.split_entity(prediction,lens)
+            gold_index = self.split_entity(gold,lens)
+            prediction_num += len(prediction_index)
+            gold_num += len(gold_index)
+            right += len([l for l in prediction_index if l in gold_index])
+        if gold_num == 0 or prediction_num == 0 or right == 0:
+            return 0, 0, 0
+        p = right/prediction_num
+        r = right/gold_num
+        f = 2*(p * r)/(p + r)
+        return  p,r,f
+
+    def split_entity(self,sentence, lens):
+        flag = False
+        start = 0
+        end = 0
+        index = []
+        for i in range(lens):
+            if sentence[i] % 2 == 1 and flag == False:
+                flag = True
+                start = i
+            elif sentence[i] % 2 == 1 and flag == True:
+                flag = True
+                end = i - 1
+                index.append((start, end))
+                start = i
+            elif sentence[i] == 0 and flag == True:
+                flag = False
+                end = i - 1
+                index.append((start, end))
+            elif i == (lens - 1) and flag == True:
+                flag = False
+                end = i
+                index.append((start, end))
+        return index
+
+
+
+
+
+
 
 
