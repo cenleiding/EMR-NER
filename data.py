@@ -8,10 +8,11 @@
 """
 import pickle
 import numpy as np
+import re
 
 class DataSet(object):
 
-    def __init__(self,corpus_path,word2id_path,embedding_path):
+    def __init__(self,word2id_path,embedding_path):
         self.tag2label = {'O': 0,
                           'B-NAME': 1, 'I-NAME': 2,
                           'B-ADDRESS': 3, 'I-ADDRESS': 4,
@@ -19,8 +20,15 @@ class DataSet(object):
                           'B-DETAIL': 7, 'I-DETAIL': 8}
         self.word2id = read_word2id(word2id_path)
         self.embeddding = read_embeddding(embedding_path)
-        (self.sentences_origin, tags) = read_corpus(corpus_path)
-        (self.sentences, self.labels, self.lengths) = sentences_tags2id(self.sentences_origin,tags,self.word2id,self.tag2label)
+
+    def read_tag_file(self,corpus_path):
+        (sentences_origin, tags) = read_corpus(corpus_path)
+        (self.sentences, self.labels, self.lengths) = sentences_tags2id(sentences_origin, tags, self.word2id,self.tag2label)
+
+    def read_demo_file(self,demo_path):
+        self.sentences_origin = read_demo(demo_path)
+        tags = [[0] for _ in range(len(self.sentences_origin))]
+        (self.sentences, self.labels, self.lengths) = sentences_tags2id(self.sentences_origin, tags, self.word2id,self.tag2label)
 
 def read_corpus(corpus_path):
     sentences,tags=[],[]
@@ -86,4 +94,35 @@ def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=400):
             lengths[i] = 0
 
     return (sentences_id_np ,tags_id_np,lengths)
+
+def read_demo(demo_path):
+    sentences =[]
+    with open(demo_path,'r',encoding='utf-8') as fr:
+        text = fr.read()
+    #中文标点转英文标点
+    chinese_punctuation = '，【】“”‘’！？（）１２３４５６７８９０'
+    english_punctuation = ',[]""\'\'!?()1234567890'
+    table = str.maketrans(chinese_punctuation, english_punctuation)
+    text = text.translate(table)
+    #全角转半角
+    newtext = ''
+    for s in text:
+        num = ord(s)
+        if num == 0x3000:
+            num = 32
+        elif 0xFF01 <= num <= 0xFF5E:
+            num -= 0xFEE0
+        u = chr(num)
+        newtext += u
+    #去除空格\n\t
+    newtext=re.sub(r'\s',"",newtext)
+    sentence = []
+    for char in newtext:
+        if char=='。':
+            sentences.append(sentence)
+            sentence = []
+        else:
+            sentence.append(char)
+    return sentences
+
 

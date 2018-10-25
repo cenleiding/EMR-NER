@@ -7,6 +7,7 @@
 @description: LSTM+CRF
 """
 import tensorflow as tf
+import os
 
 
 class BiLSTM_CRF(object):
@@ -31,10 +32,16 @@ class BiLSTM_CRF(object):
         self.global_step = tf.Variable(0,dtype=tf.int32,trainable= False,name='global_step')
 
     def add_data_set(self):
-        self.data_set = tf.data.Dataset\
-            .from_tensor_slices((self.inputs,self.labels,self.lengths))\
-            .shuffle(self.config.batch_size * 10)\
-            .batch(self.config.batch_size)
+        if self.config.isdemo :
+            self.data_set = tf.data.Dataset\
+                .from_tensor_slices((self.inputs,self.labels,self.lengths))\
+                .batch(self.config.batch_size)\
+                .repeat(1)
+        else:
+            self.data_set = tf.data.Dataset\
+                .from_tensor_slices((self.inputs,self.labels,self.lengths))\
+                .shuffle(self.config.batch_size * 10)\
+                .batch(self.config.batch_size)
         self.iter = self.data_set.make_initializable_iterator()
         self.input_batch,self.label_batch,self.length_batch = self.iter.get_next()
 
@@ -95,7 +102,10 @@ class BiLSTM_CRF(object):
 
     def train(self,train_data,val_data):
         with tf.Session(config=self.sess_config) as sess:
-            sess.run(self.init_var)
+            if self.config.retrain:
+                sess.run(self.init_var)
+            else:
+                self.saver.restore(sess, tf.train.latest_checkpoint(self.config.out_path))
 
             for epoch in range(1,self.config.epoch):
                 sess.run(self.iter.initializer, feed_dict={self.inputs: train_data.sentences,
@@ -106,7 +116,7 @@ class BiLSTM_CRF(object):
                         sess.run(self.train_op)
                         loss,global_step = sess.run([self.loss,self.global_step])
                         print('epoch=>{},step=>{}:loss is {}'.format(epoch,global_step,loss))
-                        self.saver.save(sess,self.config.out_path,global_step=self.config.global_step)
+                        self.saver.save(sess,os.path.join(self.config.out_path,self.config.model_name),global_step=self.config.global_step)
                     except tf.errors.OutOfRangeError:
                         break
 
@@ -118,31 +128,17 @@ class BiLSTM_CRF(object):
     def test(self, test_data):
         with tf.Session(config=self.sess_config) as sess:
             print('==== testing ====')
-            self.saver.restore(sess, self.config.out_path)
+            self.saver.restore(sess,tf.train.latest_checkpoint(self.config.out_path))
             predictions, prediction_lens, golds = self.predict(sess, test_data)
             p, r, f = self.evaluate(predictions,prediction_lens,golds)
             print('P:{}\nR:{}\nF:{}'.format(p,r,f))
 
     def demo(self, demo_data):
-        result = {'name':[],
-                  'address':[],
-                  'organization':[],
-                  'datail':[]}
         with tf.Session(config=self.sess_config) as sess:
             print('==== demo ====')
-            self.saver.restore(sess, self.config.out_path)
-            predictions, prediction_lens, _ = self.predict(sess, demo_data)
-            for prediction,lens,sentence_origin in zip(predictions,prediction_lens,demo_data.sentences_origin):
-                prediction_index = self.split_entity(prediction, lens)
-                for (start,end) in prediction_index:
-                    if prediction[start] == 1:
-                        result['name'].append(str(sentence_origin[start,end]))
-                    elif prediction[start] == 3:
-                        result['address'].append(str(sentence_origin[start,end]))
-                    elif prediction[start] == 5:
-                        result['organization'].append(str(sentence_origin[start, end]))
-                    elif prediction[start] == 7:
-                        result['detail'].append(str(sentence_origin[start, end]))
+            self.saver.restore(sess, tf.train.latest_checkpoint(self.config.out_path))
+            predictions, _, _ = self.predict(sess, demo_data)
+        return predictions
 
     def predict(self,sess,data):
         predictions = []

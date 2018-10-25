@@ -12,10 +12,14 @@ class model_config(object):
         self.train_data = 'resourse/data/corpus/train.txt'
         self.val_data = 'resourse/data/corpus/val.txt'
         self.test_data = 'resourse/data/corpus/test.txt'
+        self.demo_data = 'resourse/data/corpus/demo.txt'
         self.embedding_path = 'resourse/data/word2id/embedding_matrix.cpkt'
         self.word2id_path = 'resourse/data/word2id/word2id.cpkt'
-        self.out_path = 'resourse/result/test-model'
+        self.out_path = 'resourse/result'
+        self.model_name = 'test-model'
+        self.isdemo = True
 
+        self.retrain = False
         self.epoch = 100
         self.batch_size = 64
         self.hidden_dim = 256

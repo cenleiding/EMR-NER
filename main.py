@@ -28,7 +28,7 @@ parser.add_argument('--lr',type=float,default=0.001,help='训练速度')
 parser.add_argument('--dropout',type=float,default=0.5,help='dropout 值')
 parser.add_argument('--update_embedding',type=bool,default=True,help='是否一起训练embeddding')
 
-parser.add_argument('--mode',type=str,default='train',choices=['train','test','demo'],help='train:训练模型；test：测试模型；demo：使用模型')
+parser.add_argument('--mode',type=str,default='demo',choices=['train','test','demo'],help='train:训练模型；test：测试模型；demo：使用模型')
 
 args = parser.parse_args()
 
@@ -40,10 +40,58 @@ config = config.model_config()
 
 
 if args.mode == 'train':
-    train_data = data.DataSet(config.train_data,config.word2id_path,config.embedding_path)
-    val_data = data.DataSet(config.val_data,config.word2id_path,config.embedding_path)
+    train_data = data.DataSet(config.word2id_path,config.embedding_path)
+    val_data = data.DataSet(config.word2id_path,config.embedding_path)
+    train_data.read_tag_file(config.train_data)
+    val_data.read_tag_file(config.val_data)
     config.embedding_matrix = train_data.embeddding
     model = model.BiLSTM_CRF(config)
     model.build()
     model.train(train_data,val_data)
+
+if args.mode =='test':
+    test_data = data.DataSet(config.word2id_path,config.embedding_path)
+    test_data.read_tag_file(config.test_data)
+    config.embedding_matrix = test_data.embeddding
+    model = model.BiLSTM_CRF(config)
+    model.build()
+    model.test(test_data)
+
+if args.mode =='demo':
+    result = {
+        'name' : [],
+        'address' : [],
+        'organization' : [],
+        'detail' : []
+    }
+    demo_data = data.DataSet(config.word2id_path,config.embedding_path)
+    demo_data.read_demo_file(config.demo_data)
+    config.embedding_matrix = demo_data.embeddding
+    model = model.BiLSTM_CRF(config)
+    model.build()
+    predictions = model.demo(demo_data)
+    for prediction,sentence in zip(predictions,demo_data.sentences_origin):
+        index = [i for i in range(len(prediction)) if prediction[i]%2 ==1]
+        for i in index:
+            start = i
+            end = i
+            while (end+1)<=len(prediction) and prediction[end+1] == prediction[start]+1:
+                end +=1
+            if prediction[start] == 1:
+                result['name'].append(sentence[start:end + 1])
+            if prediction[start] == 3:
+                result['address'].append(sentence[start:end + 1])
+            if prediction[start] == 5:
+                result['organization'].append(sentence[start:end + 1])
+            if prediction[start] == 7:
+                result['detail'].append(sentence[start:end + 1])
+    print('原文：\n{}'.format(''.join(map(lambda sen:''.join(sen)+'\n',demo_data.sentences_origin))))
+    print('处理结果：\n')
+    print('name:{}'.format(set(map(lambda s:''.join(s),result['name']))))
+    print('address:{}'.format(set(map(lambda s:''.join(s),result['address']))))
+    print('organization:{}'.format(set(map(lambda s:''.join(s),result['organization']))))
+    print('detail:{}'.format(set(map(lambda s:''.join(s),result['detail']))))
+
+
+
 
