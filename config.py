@@ -9,14 +9,16 @@
 
 class model_config(object):
     def __init__(self):
-        self.train_data = 'resourse/data/corpus/train.txt'
-        self.val_data = 'resourse/data/corpus/val.txt'
-        self.test_data = 'resourse/data/corpus/test.txt'
-        self.demo_data = 'resourse/data/corpus/demo.txt'
-        self.embedding_path = 'resourse/data/word2id/embedding_matrix.cpkt'
-        self.word2id_path = 'resourse/data/word2id/word2id.cpkt'
-        self.out_path = 'resourse/result'
+        self.train_data = 'resource/data/corpus/train.txt'
+        self.val_data = 'resource/data/corpus/val.txt'
+        self.test_data = 'resource/data/corpus/test.txt'
+        self.demo_data = 'resource/data/corpus/demo.txt'
+        self.embedding_path = 'resource/data/word2id/embedding_matrix.cpkt'
+        self.word2id_path = 'resource/data/word2id/word2id.cpkt'
+        self.out_path = 'resource/result'
         self.model_name = 'test-model'
+        self.metric_name = 'metric.txt'
+        self.error_text = 'error.txt'
         self.isdemo = True
 
         self.retrain = False

@@ -22,13 +22,13 @@ class DataSet(object):
         self.embeddding = read_embeddding(embedding_path)
 
     def read_tag_file(self,corpus_path):
-        (sentences_origin, tags) = read_corpus(corpus_path)
-        (self.sentences, self.labels, self.lengths) = sentences_tags2id(sentences_origin, tags, self.word2id,self.tag2label)
+        (self.sentences_origin, tags) = read_corpus(corpus_path)
+        (self.sentences, self.labels, self.lengths, self.sentences_origin) = sentences_tags2id(self.sentences_origin, tags, self.word2id,self.tag2label)
 
     def read_demo_file(self,demo_path):
         self.sentences_origin = read_demo(demo_path)
         tags = [[0] for _ in range(len(self.sentences_origin))]
-        (self.sentences, self.labels, self.lengths) = sentences_tags2id(self.sentences_origin, tags, self.word2id,self.tag2label)
+        (self.sentences, self.labels, self.lengths, self.sentences_origin) = sentences_tags2id(self.sentences_origin, tags, self.word2id,self.tag2label)
 
 def read_corpus(corpus_path):
     sentences,tags=[],[]
@@ -40,7 +40,7 @@ def read_corpus(corpus_path):
             [char,label] = line.strip().split()
             sent_.append(char)
             tag_.append(label)
-        else:
+        elif len(sent_)!=0:
             sentences.append(sent_)
             tags.append(tag_)
             sent_,tag_ = [],[]
@@ -55,22 +55,20 @@ def read_embeddding(embedding_path):
     embedding_matrix = np.load(embedding_path)
     return embedding_matrix
 
-def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=400):
+def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=250):
     sentences_id = []
     tags_id = []
+    lengths_id = []
     lengths = []
+    new_sentenses = []
     for sentence in sentences:
         sentence_id = []
         for word in sentence:
-            if word.isdigit():
-                word = 'NUM'
-            elif ('\u0041' <= word <= '\u005a') or ('\u0061' <= word <= '\u007a'):
-                word = 'ENG'
             if word not in word2id:
                 word = 'UNK'
             sentence_id.append(word2id[word])
         sentences_id.append(sentence_id)
-        lengths.append(len(sentence_id))
+        lengths_id.append(len(sentence_id))
 
     for tag in tags:
         tag_id = []
@@ -78,22 +76,31 @@ def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=400):
             tag_id.append(tag2label.get(t))
         tags_id.append(tag_id)
 
-    #统一句子长度,放弃过长的句子，并转为np数组
-    length = min(max_length,max(lengths))
+    #统一句子长度,切割过长的句子，并转为np数组
 
-    sentences_id_np = np.zeros([len(sentences_id),length])
-    tags_id_np = np.zeros([len(tags_id),length])
-
-    for i ,ids in enumerate(sentences_id):
-        if lengths[i] <= length:
-            sentences_id_np[i,:lengths[i]] = np.array(ids)
-    for i ,ids in enumerate(tags_id):
-        if lengths[i] <= length:
-            tags_id_np[i,:lengths[i]] = np.array(ids)
-        else:
-            lengths[i] = 0
-
-    return (sentences_id_np ,tags_id_np,lengths)
+    sentences_id_np = np.zeros([max_length])
+    tags_id_np = np.zeros([max_length])
+    for l ,s_ids,t_ids,s in zip(lengths_id,sentences_id,tags_id,sentences):
+        new_l = l
+        while new_l >max_length:
+            new_sentense_id = np.array(s_ids[l - new_l : l - new_l + max_length])
+            new_tag = np.array(t_ids[l - new_l : l - new_l + max_length])
+            new_sentenses.append(s[l - new_l : l - new_l + max_length])
+            sentences_id_np = np.row_stack((sentences_id_np,new_sentense_id))
+            tags_id_np = np.row_stack((tags_id_np,new_tag))
+            new_l = new_l -max_length
+            lengths.append(max_length)
+        new_sentense_id = np.zeros([max_length])
+        new_sentense_id[:new_l]=np.array(s_ids[l - new_l:l])
+        new_tag = np.zeros([max_length])
+        new_tag[:new_l] = np.array(t_ids[l - new_l:l])
+        new_sentenses.append(s[l - new_l:l])
+        sentences_id_np = np.row_stack((sentences_id_np, new_sentense_id))
+        tags_id_np = np.row_stack((tags_id_np, new_tag))
+        lengths.append(new_l)
+    sentences_id_np = sentences_id_np[1:,:]
+    tags_id_np = tags_id_np[1:,:]
+    return (sentences_id_np ,tags_id_np,lengths,new_sentenses)
 
 def read_demo(demo_path):
     sentences =[]

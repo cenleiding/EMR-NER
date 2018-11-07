@@ -10,14 +10,15 @@ import data
 import argparse
 import config
 import model
+import os
 
 parser = argparse.ArgumentParser(description='BiLSTM-CRF 配置')
-parser.add_argument('--train_data',type=str,default='resourse/data/corpus/train.txt',help='训练集数据路径')
-parser.add_argument('--val_data',type=str,default='resourse/data/corpus/val.txt',help='验证集数据路径')
-parser.add_argument('--test_data',type=str,default='resourse/data/corpus/test.txt',help='测试集路径')
-parser.add_argument('--embedding_path',type=str,default='resourse/data/word2id/embedding_matrix.cpkt',help='嵌入矩阵 路径')
-parser.add_argument('--word2id_path',type=str,default='resourse/data/word2id/word2id.cpkt',help='word2id 路径')
-parser.add_argument('--out_path',type=str,default='resourse/result',help='模型保存地址')
+parser.add_argument('--train_data',type=str,default='resource/data/corpus/train.txt',help='训练集数据路径')
+parser.add_argument('--val_data',type=str,default='resource/data/corpus/val.txt',help='验证集数据路径')
+parser.add_argument('--test_data',type=str,default='resource/data/corpus/test.txt',help='测试集路径')
+parser.add_argument('--embedding_path',type=str,default='resource/data/word2id/embedding_matrix.cpkt',help='嵌入矩阵 路径')
+parser.add_argument('--word2id_path',type=str,default='resource/data/word2id/word2id.cpkt',help='word2id 路径')
+parser.add_argument('--out_path',type=str,default='resource/result',help='模型保存地址')
 
 parser.add_argument('--epoch',type=int,default=40,help='训练周期')
 parser.add_argument('--batch_size',type=int,default=64,help='批处理大小')
@@ -28,7 +29,7 @@ parser.add_argument('--lr',type=float,default=0.001,help='训练速度')
 parser.add_argument('--dropout',type=float,default=0.5,help='dropout 值')
 parser.add_argument('--update_embedding',type=bool,default=True,help='是否一起训练embeddding')
 
-parser.add_argument('--mode',type=str,default='demo',choices=['train','test','demo'],help='train:训练模型；test：测试模型；demo：使用模型')
+parser.add_argument('--mode',type=str,default='train',choices=['train','test','demo'],help='train:训练模型；test：测试模型；demo：使用模型')
 
 args = parser.parse_args()
 
@@ -55,7 +56,19 @@ if args.mode =='test':
     config.embedding_matrix = test_data.embeddding
     model = model.BiLSTM_CRF(config)
     model.build()
-    model.test(test_data)
+    error_list = model.test(test_data)
+    with open(os.path.join(config.out_path,config.error_text),'w',encoding='utf-8')as fw:
+        for error in error_list:
+            fw.write('原句：{}\n'.format(''.join(test_data.sentences_origin[error['index']])))
+            fw.write('标注：')
+            for gold_index in error['gold_index']:
+                fw.write('{}\t'.format(''.join(test_data.sentences_origin[error['index']][gold_index[0]:gold_index[1]+1])))
+            fw.write('\n')
+            fw.write('预测：')
+            for prediction_index in error['prediction_index']:
+                fw.write('{}\t'.format(''.join(test_data.sentences_origin[error['index']][prediction_index[0]:prediction_index[1]+1])))
+            fw.write('\n')
+            fw.write('\n')
 
 if args.mode =='demo':
     result = {
@@ -91,7 +104,6 @@ if args.mode =='demo':
     print('address:{}'.format(set(map(lambda s:''.join(s),result['address']))))
     print('organization:{}'.format(set(map(lambda s:''.join(s),result['organization']))))
     print('detail:{}'.format(set(map(lambda s:''.join(s),result['detail']))))
-
 
 
 

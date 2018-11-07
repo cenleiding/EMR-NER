@@ -121,8 +121,9 @@ class BiLSTM_CRF(object):
                         break
 
                 predictions, prediction_lens, golds = self.predict(sess, val_data)
-                p, r, f = self.evaluate(predictions, prediction_lens, golds)
+                p, r, f ,_= self.evaluate(predictions, prediction_lens, golds)
                 print('epoch{}:验证集\nP:{}  R:{}  F:{}'.format(epoch,p, r, f))
+                self.save_metric(epoch,p,r,f)
 
 
     def test(self, test_data):
@@ -130,8 +131,9 @@ class BiLSTM_CRF(object):
             print('==== testing ====')
             self.saver.restore(sess,tf.train.latest_checkpoint(self.config.out_path))
             predictions, prediction_lens, golds = self.predict(sess, test_data)
-            p, r, f = self.evaluate(predictions,prediction_lens,golds)
+            p, r, f, error_list = self.evaluate(predictions,prediction_lens,golds)
             print('P:{}\nR:{}\nF:{}'.format(p,r,f))
+        return error_list
 
     def demo(self, demo_data):
         with tf.Session(config=self.sess_config) as sess:
@@ -166,18 +168,26 @@ class BiLSTM_CRF(object):
         right = 0
         prediction_num = 0
         gold_num = 0
-        for prediction,gold,lens in zip(predictions,golds,prediction_lens):
+        error_list = []
+        for prediction,gold,lens,index in zip(predictions,golds,prediction_lens,range(99999)):
             prediction_index = self.split_entity(prediction,lens)
             gold_index = self.split_entity(gold,lens)
             prediction_num += len(prediction_index)
             gold_num += len(gold_index)
             right += len([l for l in prediction_index if l in gold_index])
+            if (len(prediction_index) != len(gold_index)) or(len([l for l in prediction_index if l in gold_index]) != len(prediction_index)):
+                error = {
+                    'index' : index,
+                    'prediction_index' : prediction_index,
+                    'gold_index' : gold_index
+                }
+                error_list.append(error)
         if gold_num == 0 or prediction_num == 0 or right == 0:
             return 0, 0, 0
         p = right/prediction_num
         r = right/gold_num
         f = 2*(p * r)/(p + r)
-        return  p,r,f
+        return  p,r,f,error_list
 
     def split_entity(self,sentence, lens):
         flag = False
@@ -203,6 +213,10 @@ class BiLSTM_CRF(object):
                 index.append((start, end))
         return index
 
+    def save_metric(self,epoch,p,r,f):
+        path = os.path.join(self.config.out_path,self.config.metric_name)
+        with open(path,'a',encoding='utf-8') as fw:
+            fw.write('{}\t{}\t{}\t{}\n'.format(epoch,p,r,f))
 
 
 
