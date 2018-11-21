@@ -29,7 +29,7 @@ parser.add_argument('--lr',type=float,default=0.001,help='训练速度')
 parser.add_argument('--dropout',type=float,default=0.5,help='dropout 值')
 parser.add_argument('--update_embedding',type=bool,default=True,help='是否一起训练embeddding')
 
-parser.add_argument('--mode',type=str,default='train',choices=['train','test','demo'],help='train:训练模型；test：测试模型；demo：使用模型')
+parser.add_argument('--mode',type=str,default='train',choices=['train','test','demo','export'],help='train:训练模型；test：测试模型；demo：使用模型')
 
 args = parser.parse_args()
 
@@ -88,7 +88,7 @@ if args.mode =='demo':
         for i in index:
             start = i
             end = i
-            while (end+1)<=len(prediction) and prediction[end+1] == prediction[start]+1:
+            while (end+1)<len(prediction) and prediction[end+1] == prediction[start]+1:
                 end +=1
             if prediction[start] == 1:
                 result['name'].append(sentence[start:end + 1])
@@ -104,6 +104,14 @@ if args.mode =='demo':
     print('address:{}'.format(set(map(lambda s:''.join(s),result['address']))))
     print('organization:{}'.format(set(map(lambda s:''.join(s),result['organization']))))
     print('detail:{}'.format(set(map(lambda s:''.join(s),result['detail']))))
+
+if args.mode =='export':
+    embeddding = data.DataSet(config.word2id_path,config.embedding_path)
+    config.embedding_matrix = embeddding.embeddding
+    model = model.BiLSTM_CRF(config)
+    model.build()
+    model.export(config.export_path)
+
 
 
 

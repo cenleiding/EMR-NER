@@ -17,11 +17,12 @@ class model_config(object):
         self.word2id_path = 'resource/data/word2id/word2id.cpkt'
         self.out_path = 'resource/result'
         self.model_name = 'test-model'
+        self.export_path = 'resource/result/EMR_NER/0001'
         self.metric_name = 'metric.txt'
         self.error_text = 'error.txt'
         self.isdemo = True
 
-        self.retrain = False
+        self.retrain = True
         self.epoch = 100
         self.batch_size = 64
         self.hidden_dim = 256

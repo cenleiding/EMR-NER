@@ -26,8 +26,7 @@ class DataSet(object):
         (self.sentences, self.labels, self.lengths, self.sentences_origin) = sentences_tags2id(self.sentences_origin, tags, self.word2id,self.tag2label)
 
     def read_demo_file(self,demo_path):
-        self.sentences_origin = read_demo(demo_path)
-        tags = [[0] for _ in range(len(self.sentences_origin))]
+        (self.sentences_origin,tags) = read_demo(demo_path)
         (self.sentences, self.labels, self.lengths, self.sentences_origin) = sentences_tags2id(self.sentences_origin, tags, self.word2id,self.tag2label)
 
 def read_corpus(corpus_path):
@@ -104,6 +103,7 @@ def sentences_tags2id(sentences,tags,word2id,tag2label,max_length=250):
 
 def read_demo(demo_path):
     sentences =[]
+    tags = []
     with open(demo_path,'r',encoding='utf-8') as fr:
         text = fr.read()
     #中文标点转英文标点
@@ -124,12 +124,16 @@ def read_demo(demo_path):
     #去除空格\n\t
     newtext=re.sub(r'\s',"",newtext)
     sentence = []
+    tag = []
     for char in newtext:
         if char=='。':
             sentences.append(sentence)
             sentence = []
+            tags.append(tag)
+            tag = []
         else:
             sentence.append(char)
-    return sentences
+            tag.append('O')
+    return (sentences,tags)
 
 

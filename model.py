@@ -7,6 +7,7 @@
 @description: LSTM+CRF
 """
 import tensorflow as tf
+import numpy as np
 import os
 
 
@@ -21,6 +22,7 @@ class BiLSTM_CRF(object):
         self.embedding_layer()
         self.biLSTM_layer()
         self.loss_op()
+        self.crf_pred()
         self.trainstep_op()
         self.init_op()
 
@@ -86,6 +88,9 @@ class BiLSTM_CRF(object):
                                                                                    sequence_lengths=self.length_batch)
         self.loss = -tf.reduce_mean(log_likelihood,name='loss')
 
+    def crf_pred(self):
+        self.decode_tags, _ = tf.contrib.crf.crf_decode(self.logits, self.transition_params, self.length_batch)
+
     def trainstep_op(self):
         if self.config.optimizer == 'Adam':
             optim = tf.train.AdamOptimizer(learning_rate=self.config.lr)
@@ -120,8 +125,8 @@ class BiLSTM_CRF(object):
                     except tf.errors.OutOfRangeError:
                         break
 
-                predictions, prediction_lens, golds = self.predict(sess, val_data)
-                p, r, f ,_= self.evaluate(predictions, prediction_lens, golds)
+                predictions, prediction_lens = self.predict(sess, val_data.sentences,val_data.lengths)
+                p, r, f ,_= self.evaluate(predictions, prediction_lens, val_data.labels)
                 print('epoch{}:验证集\nP:{}  R:{}  F:{}'.format(epoch,p, r, f))
                 self.save_metric(epoch,p,r,f)
 
@@ -130,8 +135,8 @@ class BiLSTM_CRF(object):
         with tf.Session(config=self.sess_config) as sess:
             print('==== testing ====')
             self.saver.restore(sess,tf.train.latest_checkpoint(self.config.out_path))
-            predictions, prediction_lens, golds = self.predict(sess, test_data)
-            p, r, f, error_list = self.evaluate(predictions,prediction_lens,golds)
+            predictions, prediction_lens = self.predict(sess, test_data.sentences, test_data.lengths)
+            p, r, f, error_list = self.evaluate(predictions,prediction_lens,test_data.labels)
             print('P:{}\nR:{}\nF:{}'.format(p,r,f))
         return error_list
 
@@ -139,30 +144,38 @@ class BiLSTM_CRF(object):
         with tf.Session(config=self.sess_config) as sess:
             print('==== demo ====')
             self.saver.restore(sess, tf.train.latest_checkpoint(self.config.out_path))
-            predictions, _, _ = self.predict(sess, demo_data)
+            predictions, _ = self.predict(sess, demo_data.sentences, demo_data.lengths)
         return predictions
 
-    def predict(self,sess,data):
-        predictions = []
-        prediction_lens = []
-        golds = []
-        sess.run(self.iter.initializer, feed_dict={self.inputs: data.sentences,
-                                                   self.labels: data.labels,
-                                                   self.lengths: data.lengths})
-        while True:
-            try:
-                seq_len_list,labels,logits,transition_params = sess.run([self.length_batch,self.label_batch,self.logits,self.transition_params])
-                label_list = []
-                for logit,seq_len in zip(logits,seq_len_list):
-                    viterbi_seq,_ = tf.contrib.crf.viterbi_decode(logit[:seq_len],transition_params)
-                    label_list.append(viterbi_seq)
-                predictions.extend(label_list)
-                prediction_lens.extend(seq_len_list)
-                golds.extend(labels)
-            except tf.errors.OutOfRangeError:
-                break
+    def predict(self,sess,sentences,lengths):
+        predictions =[]
+        batch_size = self.config.batch_size
+        index_l = 0
+        index_r = batch_size
+        while index_l < sentences.shape[0]:
+            prediction = sess.run(self.decode_tags, feed_dict={self.input_batch: sentences[index_l:index_r],
+                                                               self.length_batch: lengths[index_l:index_r]})
+            predictions.extend(prediction)
+            index_l += batch_size
+            index_r = min(index_r+batch_size,sentences.shape[0])
 
-        return predictions,prediction_lens,golds
+        # sess.run(self.iter.initializer, feed_dict={self.inputs: data.sentences,
+        #                                            self.labels: data.labels,
+        #                                            self.lengths: data.lengths})
+        # while True:
+        #     try:
+        #         seq_len_list,labels,logits,transition_params = sess.run([self.length_batch,self.label_batch,self.logits,self.transition_params])
+        #         label_list = []
+        #         for logit,seq_len in zip(logits,seq_len_list):
+        #             viterbi_seq,_ = tf.contrib.crf.viterbi_decode(logit[:seq_len],transition_params)
+        #             label_list.append(viterbi_seq)
+        #         predictions.extend(label_list)
+        #         prediction_lens.extend(seq_len_list)
+        #         golds.extend(labels)
+        #     except tf.errors.OutOfRangeError:
+        #         break
+
+        return predictions,lengths
 
     def evaluate(self,predictions,prediction_lens,golds):
         right = 0
@@ -218,7 +231,28 @@ class BiLSTM_CRF(object):
         with open(path,'a',encoding='utf-8') as fw:
             fw.write('{}\t{}\t{}\t{}\n'.format(epoch,p,r,f))
 
+    def export(self,path):
+        builder = tf.saved_model.builder.SavedModelBuilder(path)
+        with tf.Session(config=self.sess_config) as sess:
+            self.saver.restore(sess, tf.train.latest_checkpoint(self.config.out_path))
 
+            input_info = tf.saved_model.utils.build_tensor_info(self.input_batch)
+            length_info = tf.saved_model.utils.build_tensor_info(self.length_batch)
+            output_info = tf.saved_model.utils.build_tensor_info(self.decode_tags)
+            prediction_signature = (
+                tf.saved_model.signature_def_utils.build_signature_def(
+                    inputs={'input': input_info,
+                            'length': length_info},
+                    outputs={'pred': output_info},
+                    method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME))
+
+            builder.add_meta_graph_and_variables(sess,
+                                                 [tf.saved_model.tag_constants.SERVING],
+                                                 signature_def_map={
+                                                     'predict': prediction_signature
+                                                 })
+
+            builder.save()
 
 
 
