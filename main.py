@@ -11,6 +11,7 @@ import argparse
 import config
 import model
 import os
+import numpy as np
 
 parser = argparse.ArgumentParser(description='BiLSTM-CRF 配置')
 parser.add_argument('--train_data',type=str,default='resource/data/corpus/train.txt',help='训练集数据路径')
@@ -29,7 +30,7 @@ parser.add_argument('--lr',type=float,default=0.001,help='训练速度')
 parser.add_argument('--dropout',type=float,default=0.5,help='dropout 值')
 parser.add_argument('--update_embedding',type=bool,default=True,help='是否一起训练embeddding')
 
-parser.add_argument('--mode',type=str,default='train',choices=['train','test','demo','export'],help='train:训练模型；test：测试模型；demo：使用模型')
+parser.add_argument('--mode',type=str,default='demo',choices=['train','test','demo','export'],help='train:训练模型；test：测试模型；demo：使用模型')
 
 args = parser.parse_args()
 
@@ -80,6 +81,8 @@ if args.mode =='demo':
     demo_data = data.DataSet(config.word2id_path,config.embedding_path)
     demo_data.read_demo_file(config.demo_data)
     config.embedding_matrix = demo_data.embeddding
+    np.set_printoptions(suppress=True)
+    print(demo_data.sentences[0,:])
     model = model.BiLSTM_CRF(config)
     model.build()
     predictions = model.demo(demo_data)

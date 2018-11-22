@@ -22,7 +22,7 @@ class model_config(object):
         self.error_text = 'error.txt'
         self.isdemo = True
 
-        self.retrain = True
+        self.retrain = False
         self.epoch = 100
         self.batch_size = 64
         self.hidden_dim = 256

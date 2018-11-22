@@ -65,7 +65,7 @@ class metric_animation_plot(object):
         return interval_p,interval_r,interval_f
 
     def plot(self):
-        ani = animation.FuncAnimation(self.fig,self.animate,interval=1000)
+        ani = animation.FuncAnimation(self.fig,self.animate,interval=5000)
         plt.show()
 
 if __name__ == '__main__':
