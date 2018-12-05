@@ -30,7 +30,7 @@ parser.add_argument('--lr',type=float,default=0.001,help='训练速度')
 parser.add_argument('--dropout',type=float,default=0.5,help='dropout 值')
 parser.add_argument('--update_embedding',type=bool,default=True,help='是否一起训练embeddding')
 
-parser.add_argument('--mode',type=str,default='demo',choices=['train','test','demo','export'],help='train:训练模型；test：测试模型；demo：使用模型')
+parser.add_argument('--mode',type=str,default='test',choices=['train','test','demo','export'],help='train:训练模型；test：测试模型；demo：使用模型')
 
 args = parser.parse_args()
 

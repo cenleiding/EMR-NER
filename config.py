@@ -22,13 +22,15 @@ class model_config(object):
         self.error_text = 'error.txt'
         self.isdemo = True
 
-        self.retrain = False
-        self.epoch = 100
-        self.batch_size = 64
+        self.retrain = True
+        self.epoch = 500
+        self.batch_size = 128
         self.hidden_dim = 256
         self.optimizer = 'Adam'
         self.CRF = True
-        self.lr = 0.001
+        self.lr = 0.01
+        self.decay_rate = 0.98
+        self.decay_steps = 100
         self.dropout = 0.2
         self.update_embedding = True
         self.num_tags = 9

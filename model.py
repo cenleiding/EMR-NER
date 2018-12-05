@@ -61,13 +61,15 @@ class BiLSTM_CRF(object):
     def biLSTM_layer(self):
         cell_fw = tf.contrib.rnn.BasicLSTMCell(self.config.hidden_dim)
         cell_bw = tf.contrib.rnn.BasicLSTMCell(self.config.hidden_dim)
+        cell_fw = tf.nn.rnn_cell.DropoutWrapper(cell = cell_fw,output_keep_prob=self.config.dropout)
+        cell_bw = tf.nn.rnn_cell.DropoutWrapper(cell = cell_bw,output_keep_prob=self.config.dropout)
+
         (output_fw_seq,output_bw_seq),_ = tf.nn.bidirectional_dynamic_rnn(cell_fw,
                                                                           cell_bw,
                                                                           inputs=self.embeddding_inputs,
                                                                           sequence_length=self.length_batch,
                                                                           dtype=tf.float32)
         output = tf.concat([output_fw_seq,output_bw_seq],axis=-1)
-        output = tf.nn.dropout(output,self.config.dropout)
 
         W = tf.get_variable(name='W',
                             shape=[2 * self.config.hidden_dim,self.config.num_tags],
@@ -92,10 +94,15 @@ class BiLSTM_CRF(object):
         self.decode_tags, _ = tf.contrib.crf.crf_decode(self.logits, self.transition_params, self.length_batch)
 
     def trainstep_op(self):
+        self.learning_rate = tf.train.exponential_decay(learning_rate=self.config.lr,
+                                                   global_step=self.global_step,
+                                                   decay_rate=self.config.decay_rate,
+                                                   decay_steps=self.config.decay_steps,
+                                                   staircase= True)
         if self.config.optimizer == 'Adam':
-            optim = tf.train.AdamOptimizer(learning_rate=self.config.lr)
+            optim = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         else:
-            optim = tf.train.GradientDescentOptimizer(learning_rate=self.config.lr)
+            optim = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
 
         self.train_op = optim.minimize(self.loss,global_step=self.global_step)
 
@@ -119,8 +126,8 @@ class BiLSTM_CRF(object):
                 while True:
                     try:
                         sess.run(self.train_op)
-                        loss,global_step = sess.run([self.loss,self.global_step])
-                        print('epoch=>{},step=>{}:loss is {}'.format(epoch,global_step,loss))
+                        loss,global_step,lr = sess.run([self.loss,self.global_step,self.learning_rate])
+                        print('epoch=>{},step=>{},lr=>{}:loss is {}'.format(epoch,global_step,lr,loss))
                         self.saver.save(sess,os.path.join(self.config.out_path,self.config.model_name),global_step=self.config.global_step)
                     except tf.errors.OutOfRangeError:
                         break
@@ -196,7 +203,7 @@ class BiLSTM_CRF(object):
                 }
                 error_list.append(error)
         if gold_num == 0 or prediction_num == 0 or right == 0:
-            return 0, 0, 0
+            return 0, 0, 0,error_list
         p = right/prediction_num
         r = right/gold_num
         f = 2*(p * r)/(p + r)
